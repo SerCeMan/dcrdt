@@ -177,9 +177,61 @@ object Value : Query<GCCounterState, Int> {
 
 class CasualContext(
   private val context: Map<Int, Nat> // compact version vector
-) {
+) : State<CasualContext> {
   fun max(i: Int): Nat = context[i] ?: 0
   fun next(i: Int): Pair<Int, Nat> = i to max(i) + 1
+
+  override fun join(m: CasualContext): CasualContext {
+    val newMap = hashMapOf<Int, Nat>()
+    newMap.putAll(context)
+    for ((k, v) in m.context) {
+      newMap[k] = Math.max(newMap[k] ?: 0, v)
+    }
+    return CasualContext(newMap)
+  }
+}
+
+interface DotStore {
+  fun dots(): Set<Pair<Int, Nat>>
+}
+
+class DotSet(
+  val m: Set<Pair<Int, Nat>>
+) : DotStore {
+  override fun dots(): Set<Pair<Int, Nat>> = m
+}
+
+class DotFun<V : State<V>>(
+  private val m: Map<Pair<Int, Nat>, V>
+) : DotStore {
+  override fun dots(): Set<Pair<Int, Nat>> = m.keys
+}
+
+class DotMap<K, V : DotStore>(
+  private val m: Map<K, V>
+) : DotStore {
+  override fun dots(): Set<Pair<Int, Nat>> = m.values
+    .map { it.dots() }
+    .reduce { a, b -> a.union(b) }
+}
+
+
+class Casual<T : DotStore>(
+  private val t: DotStore,
+  private val cs: CasualContext
+) : State<Casual<T>> {
+  override fun join(m: Casual<T>): Casual<T> {
+    return when (t) {
+      is DotSet -> {
+        TODO()
+//        val t2 = m.t as? DotSet ?: throw IllegalArgumentException()
+//        Casual( //
+//          DotSet(t.m.intersect(t2.m).union(t.m.minus(cs))
+//          , cs.join(m.cs)
+//        )
+      }
+    }
+  }
 }
 
 
