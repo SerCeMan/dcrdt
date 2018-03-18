@@ -242,7 +242,7 @@ data class DotMap<K, V : DotStore>(
 
 
 interface Casual<Store : DotStore> : Lattice<Casual<Store>> {
-  val store: DotStore
+  val store: Store
   val cs: CasualContext
 }
 
@@ -357,7 +357,7 @@ class CasualDotMap<K, S : DotStore>(
       val pair = casual1.join(casual2)
       return when {
         pair.store.dots().isEmpty() -> null
-        else -> pair.store as T
+        else -> pair.store
       }
     }
   }
@@ -374,10 +374,6 @@ class PairLattice<A : Lattice<A>, B : Lattice<B>>(
     )
   }
 
-  fun isBottom(): Boolean {
-    return a == null && b == null
-  }
-
   companion object {
     fun <A : Lattice<A>> join(a: A?, b: A?): A? {
       return when {
@@ -389,13 +385,6 @@ class PairLattice<A : Lattice<A>, B : Lattice<B>>(
     }
   }
 }
-
-class Bottom<A>: Comparable<A> {
-  override fun compareTo(other: A): Int {
-    return -1;
-  }
-}
-
 
 class LexPair<A : Comparable<A>, B>(
   val a: A?,
@@ -475,7 +464,7 @@ class Add<E> : Mutator<AWSet<E>, E> {
 }
 
 class Remove<E> : Mutator<AWSet<E>, E> {
-  override fun apply(i: ID, state: AWSet<E>, e: E): AWSet<E> {
+  override fun apply(id: ID, state: AWSet<E>, e: E): AWSet<E> {
     val m: DotMap<E, DotSet> = state.casual.store
     val me = (m[e] ?: DotSet())
     return AWSet(
@@ -494,39 +483,50 @@ class Elements<E> : Query<AWSet<E>, Set<E>> {
   }
 }
 
+class ORMap<K, DS: DotStore, V: Casual<DS>>(
+  val casual: CasualDotMap<K, DS>
+): Lattice<ORMap<K, DS, V>> {
+  override fun join(other: ORMap<K, DS, V>): ORMap<K, DS, V> {
+    return ORMap(casual.join(other.casual))
+  }
+}
 
+class Apply<K, DS: DotStore, Args, M : Mutator<V, Args>, V>(
+  val supplier: () -> DS
+): Mutator<ORMap<K, DS, V>, Triple<K, M, Args>>  {
+  override fun apply(id: ID, state: ORMap<K, DS, V>, args: Triple<K, M, Args>): ORMap<K, DS, V> {
+    val (k, deltaMutator, deltaMutatorArgs) = args
+    val m: DS = state.casual.store[k] ?: supplier()
+    val cs = state.casual.cs
+    val result: Casual<DS> = deltaMutator.apply(id, m.asCasual(cs), deltaMutatorArgs)
+    val v: V = result.store
+    val cc: CasualContext = result.cs
+    return ORMap(
+      CasualDotMap(
+        store = DotMap(mapOf(k to v)),
+        cs = cc
+      )
+    )
+  }
+}
 
+class ORMRemove<K, V: DotStore>: Mutator<ORMap<K, V>, K> {
+  override fun apply(id: ID, state: ORMap<K, V>, k: K): ORMap<K, V> {
+    val m: V? = state.casual.store[k]
+    return ORMap(
+      CasualDotMap(
+        store = DotMap(),
+        cs = CasualContext(m?.dots() ?: emptySet())
+      )
+    )
+  }
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+private fun <V: DotStore> V.asCasual(cs: CasualContext): Casual<V> {
+  return when(this) {
+    is DotSet -> CasualDotSet(this, cs) as Casual<V>
+    is DotFun<*> -> CasualDotFun(this as DotFun<Nothing>, cs) as Casual<V>
+    is DotMap<*, *> -> CasualDotMap(this as DotMap<Nothing, Nothing>, cs) as Casual<V>
+    else -> throw IllegalArgumentException()
+  }
+}
