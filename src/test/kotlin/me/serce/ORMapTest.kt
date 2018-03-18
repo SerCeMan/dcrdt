@@ -6,49 +6,27 @@ import org.junit.jupiter.api.Test
 
 internal class ORMapTest {
 
-    lateinit var global: Global<ORMap<Int, AWSet<Char>>>
-    lateinit var set1: AntiEntropy<AWSet<Char>>
-    lateinit var set2: AntiEntropy<AWSet<Char>>
+  lateinit var global: Global<ORMap<Int, DotSet, AWSet<String>>>
+  lateinit var map1: AntiEntropy<ORMap<Int, DotSet, AWSet<String>>>
+  lateinit var set2: AntiEntropy<ORMap<Int, DotSet, AWSet<String>>>
 
-    @BeforeEach
-    fun setUp() {
-        global = Global()
-        set1 = global.create { AWSet() }
-        set2 = global.create { AWSet() }
-    }
+  @BeforeEach
+  fun setUp() {
+    global = Global()
+    map1 = global.create { ORMap<Int, DotSet, AWSet<String>>() }
+    set2 = global.create { ORMap<Int, DotSet, AWSet<String>>() }
+  }
 
-    @Test
-    fun testMe() {
-        assertEquals(setOf<Int>(), set1.query(Elements()))
-        assertEquals(setOf<Int>(), set2.query(Elements()))
-        set1.operation(Add(), 'A')
-        println(set1)
-        println(set2)
-        assertEquals(setOf('A'), set1.query(Elements()))
-        assertEquals(setOf<Char>(), set2.query(Elements()))
-        set1.shipIntervalOrState()
-        assertEquals(setOf('A'), set1.query(Elements()))
-        assertEquals(setOf('A'), set2.query(Elements()))
-        set1.operation(Add(), 'B')
-        println(set1)
-        println(set2)
-        assertEquals(setOf('A', 'B'), set1.query(Elements()))
-        assertEquals(setOf('A'), set2.query(Elements()))
-        set2.operation(Remove(), 'A')
-        println(set1)
-        println(set2)
-        assertEquals(setOf('A', 'B'), set1.query(Elements()))
-        assertEquals(setOf<Char>(), set2.query(Elements()))
-        set1.shipIntervalOrState()
-        set2.shipIntervalOrState()
-        assertEquals(setOf('B'), set1.query(Elements()))
-        assertEquals(setOf('B'), set2.query(Elements()))
+  @Test
+  fun testMe() {
+//    map1.operation(Apply<Int, DotSet, Unit, Mutator<AWSet<String>, Unit>, AWSet<String>>({ DotSet() }),
+//      Triple(1, object: Mutator<AWSet<String>, Unit> {
+//        override fun apply(id: ID, state: AWSet<String>, args: Unit): AWSet<String> {
+//          return null!!
+//        }
+//      }, Unit))
+    assertEquals(setOf<Int>(), map1.query(Elements()))
+    assertEquals(setOf<Int>(), set2.query(Elements()))
 
-        set1.operation(Remove(), 'C')
-        set2.operation(Add(), 'C')
-        set1.shipIntervalOrState()
-        set2.shipIntervalOrState()
-        assertEquals(setOf('B', 'C'), set1.query(Elements()))
-        assertEquals(setOf('B', 'C'), set2.query(Elements()))
-    }
+  }
 }
