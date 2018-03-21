@@ -6,15 +6,15 @@ import org.junit.jupiter.api.Test
 
 internal class EWFlagTest {
 
-  lateinit var global: Global<EWFlag>
+  lateinit var g: Global<EWFlag>
   lateinit var flag1: AntiEntropy<EWFlag>
   lateinit var flag2: AntiEntropy<EWFlag>
 
   @BeforeEach
   fun setUp() {
-    global = Global()
-    flag1 = global.create { EWFlag() }
-    flag2 = global.create { EWFlag() }
+    g = Global()
+    flag1 = g.create { EWFlag() }
+    flag2 = g.create { EWFlag() }
   }
 
   @Test
@@ -25,13 +25,13 @@ internal class EWFlagTest {
 
     println(flag1)
 
-    flag1.shipIntervalOrState()
+    g.shipIntervalOrState(flag1)
     assertEquals(true, flag1.query(Read))
     assertEquals(true, flag2.query(Read))
 
     flag2.operation(Disable)
-    flag1.shipIntervalOrState()
-    flag2.shipIntervalOrState()
+    g.shipIntervalOrState(flag1)
+    g.shipIntervalOrState(flag2)
     assertEquals(false, flag1.query(Read))
     assertEquals(false, flag2.query(Read))
   }

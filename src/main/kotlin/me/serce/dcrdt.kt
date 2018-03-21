@@ -71,29 +71,37 @@ class Global<S : Lattice<S>>(
   fun create(factory: () -> S): AntiEntropy<S> {
     val state = factory()
     val n = ID(nodes.size)
-    val node = AntiEntropy(this, n, state)
+    val node = AntiEntropy(n, X = state)
     nodes[n] = node
     return node
   }
 
-  fun sendAck(j: ID, n: Nat) {
-    neighbour(j).receiveAck(j, n)
+  fun send(from: ID, to: ID, delta: S, n: Nat) {
+    neighbour(to).receive(from, delta, n)
+    neighbour(from).receiveAck(to, n)
   }
 
-  fun send(j: ID, delta: S, c: Nat) {
-    neighbour(j).receive(j, delta, c)
+  fun shipIntervalOrState(node: AntiEntropy<S>) {
+    for (jid in 0 until nodes.size) {
+      val j = ID(jid)
+      if (j == node.i) {
+        continue
+      }
+      val delta: S? = node.getStateToSendTo(j)
+      if (delta != null) {
+        send(node.i, j, delta, node.c)
+      }
+    }
+    node.gc()
   }
-
-  fun size(): Int = nodes.size
 }
 
 data class AntiEntropy<S : Lattice<S>>(
-  val g: Global<S>,
-  private val i: ID,
-  var X: S,
+  val i: ID,
   var c: Nat = 0,
-  var D: Map<Nat, S> = hashMapOf(), // deltas
-  var A: Map<ID, Nat> = hashMapOf() // ack map
+  private var X: S,
+  private var D: Map<Nat, S> = hashMapOf(),
+  private var A: Map<ID, Nat> = hashMapOf() // ack map
 ) {
   fun receive(j: ID, delta: S, n: Nat) {
     val newState: S = X.join(delta)
@@ -102,7 +110,6 @@ data class AntiEntropy<S : Lattice<S>>(
       D = D.plus(c to delta)
       c += 1
     }
-    g.sendAck(j, n)
   }
 
   fun receiveAck(j: ID, n: Nat) {
@@ -124,26 +131,6 @@ data class AntiEntropy<S : Lattice<S>>(
     return q.apply(X)
   }
 
-  fun shipIntervalOrState() {
-    for (jid in 0 until g.size()) {
-      val j = ID(jid)
-      if (j == i) {
-        continue
-      }
-      val ackNumber = A[j] ?: 0
-      val delta: S = when {
-        D.isEmpty() || (D.keys.min() ?: 0) > ackNumber -> X
-        else ->
-          D.filter { (l, _) -> l in ackNumber..(c - 1) }
-            .map { (_, s) -> s }
-            .reduce { s1, s2 -> s1.join(s2) }
-      }
-      if (ackNumber < c) {
-        g.send(j, delta, c)
-      }
-    }
-  }
-
   fun gc() {
     val l = A.values.min() ?: 0
     D = D.filter { (n, _) -> n >= l }
@@ -151,6 +138,19 @@ data class AntiEntropy<S : Lattice<S>>(
 
   override fun toString(): String {
     return X.toString()
+  }
+
+  fun getStateToSendTo(to: ID): S? {
+    val ackNumber = A[to] ?: 0
+    return when {
+      D.isEmpty() || (D.keys.min() ?: 0) > ackNumber -> X
+      D.filter { (l, _) -> l in ackNumber..(c - 1) }.isEmpty() -> null
+      ackNumber < c ->
+        D.filter { (l, _) -> l in ackNumber..(c - 1) }
+          .map { (_, s) -> s }
+          .fold<S, S?>(null) { s1, s2 -> s1?.join(s2) ?: s2 }
+      else -> null
+    }
   }
 }
 
@@ -467,11 +467,11 @@ class Elements<E> : Query<AWSet<E>, Set<E>> {
   }
 }
 
-class ORRMap<K, DS: DotStore, V: Casual<DS, V>>(
+class ORRMap<K, DS : DotStore, V : Casual<DS, V>>(
   private val casual: CasualDotMap<K, DS>,
   override val store: DS = TODO(),
   override val cs: CasualContext = casual.cs
-): Casual<DS, ORRMap<K, DS, V>> {
+) : Casual<DS, ORRMap<K, DS, V>> {
   override fun join(other: ORRMap<K, DS, V>): ORRMap<K, DS, V> {
     return ORRMap(casual.join(other.casual))
   }

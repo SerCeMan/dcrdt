@@ -6,15 +6,15 @@ import org.junit.jupiter.api.Test
 
 internal class CounterTest {
 
-  lateinit var counterGlobal: Global<GCCounterState>
+  lateinit var g: Global<GCCounterState>
   lateinit var counter1: AntiEntropy<GCCounterState>
   lateinit var counter2: AntiEntropy<GCCounterState>
 
   @BeforeEach
   internal fun setUp() {
-    counterGlobal = Global()
-    counter1 = counterGlobal.create { GCCounterState() }
-    counter2 = counterGlobal.create { GCCounterState() }
+    g = Global()
+    counter1 = g.create { GCCounterState() }
+    counter2 = g.create { GCCounterState() }
   }
 
   @Test
@@ -27,10 +27,10 @@ internal class CounterTest {
     counter2.operation(Inc)
     assertEquals(1, counter1.query(Value))
     assertEquals(1, counter2.query(Value))
-    counter1.shipIntervalOrState()
+    g.shipIntervalOrState(counter1)
     assertEquals(1, counter1.query(Value))
     assertEquals(2, counter2.query(Value))
-    counter2.shipIntervalOrState()
+    g.shipIntervalOrState(counter2)
     assertEquals(2, counter1.query(Value))
     assertEquals(2, counter2.query(Value))
   }
